@@ -3,56 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Angeleads Router</title>
+    <title>Angeleads GeoMap</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
     <style>
         body { background-color: #111827; color: white; -webkit-tap-highlight-color: transparent; }
         .input-focus:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-        /* Animação do Microfone */
-        .mic-active { animation: pulse-red 1.5s infinite; background-color: #ef4444 !important; border-color: #ef4444 !important; }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
+        /* Ajustes do Mapa */
+        #map { height: 60vh; width: 100%; border-radius: 1rem; z-index: 1; }
+        .leaflet-routing-container { display: none !important; } /* Esconde o texto da rota, deixa só o desenho */
     </style>
 </head>
-<body x-data="routerApp()">
+<body x-data="geoApp()">
 
-    <div x-show="view === 'home'" class="h-screen flex flex-col justify-center items-center bg-gray-900 transition-all">
-        <button @click="view = 'input'" class="text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-full px-8 py-3 transition-all text-sm tracking-widest uppercase font-light">
-            Definir Rotas
+    <div x-show="view === 'home'" class="h-screen flex flex-col justify-center items-center bg-gray-900">
+        <div class="text-center mb-8">
+            <i class="fa-solid fa-map-location-dot text-4xl text-blue-500 mb-2"></i>
+            <h1 class="text-xl font-bold">Angeleads<br><span class="text-gray-500 text-sm">Geo System</span></h1>
+        </div>
+        <button @click="view = 'input'" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-blue-900/40">
+            Iniciar Rota Sniper
         </button>
     </div>
 
     <div x-show="view === 'input'" class="min-h-screen flex flex-col bg-gray-900 p-6 pb-32">
-        <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-6 text-center">Adicionar Parada</h2>
+        <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-6 text-center">Adicionar Alvos</h2>
         
-        <div class="bg-gray-800 rounded-2xl p-4 border border-gray-700 shadow-xl">
-            <label class="text-xs text-gray-400 ml-1">Nome do Cliente</label>
-            <input type="text" x-model="tempNome" placeholder="Ex: Maria Silva" class="w-full bg-gray-900 text-white p-3 rounded-lg border border-gray-700 mt-1 mb-4 input-focus">
+        <div class="bg-gray-800 rounded-2xl p-4 border border-gray-700 shadow-xl relative">
+            <div x-show="loading" class="absolute inset-0 bg-gray-800/90 z-10 flex flex-col items-center justify-center rounded-2xl">
+                <i class="fa-solid fa-circle-notch fa-spin text-blue-500 text-2xl"></i>
+                <p class="text-xs text-gray-400 mt-2">Buscando GPS...</p>
+            </div>
+
+            <label class="text-xs text-gray-400 ml-1">Cliente</label>
+            <input type="text" x-model="tempNome" placeholder="Ex: Maria" class="w-full bg-gray-900 text-white p-3 rounded-lg border border-gray-700 mt-1 mb-4 input-focus">
             
-            <label class="text-xs text-gray-400 ml-1">Endereço Completo</label>
+            <label class="text-xs text-gray-400 ml-1">Endereço (Fale ou Digite)</label>
             <div class="flex gap-2 mt-1">
-                <input type="text" x-model="tempEndereco" placeholder="Ex: Av. 7 de Setembro, 1000" class="w-full bg-gray-900 text-white p-3 rounded-lg border border-gray-700 input-focus">
-                <button @click="startVoice()" :class="listening ? 'mic-active' : 'bg-gray-700'" class="w-14 rounded-lg flex items-center justify-center transition-colors border border-gray-600">
+                <input type="text" x-model="tempEndereco" placeholder="Rua, Número - Bairro" class="w-full bg-gray-900 text-white p-3 rounded-lg border border-gray-700 input-focus">
+                <button @click="startVoice()" class="w-14 bg-gray-700 rounded-lg flex items-center justify-center border border-gray-600">
                     <i class="fa-solid fa-microphone text-white"></i>
                 </button>
             </div>
             
-            <button @click="addPoint()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg flex justify-center items-center gap-2">
-                <i class="fa-solid fa-plus"></i> Adicionar à Lista
+            <button @click="addPoint()" class="w-full mt-4 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2">
+                <i class="fa-solid fa-crosshairs"></i> Localizar e Adicionar
             </button>
         </div>
 
-        <div class="mt-8 space-y-3">
+        <div class="mt-6 space-y-2">
             <template x-for="(ponto, index) in pontos" :key="index">
                 <div class="flex justify-between items-center bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">
                     <div>
-                        <p class="font-bold text-sm text-gray-200" x-text="ponto.nome"></p>
-                        <p class="text-xs text-gray-500 truncate w-48" x-text="ponto.endereco"></p>
+                        <p class="font-bold text-sm text-green-400" x-text="ponto.nome"></p>
+                        <p class="text-[10px] text-gray-500" x-text="ponto.lat + ', ' + ponto.lon"></p>
                     </div>
                     <button @click="removePoint(index)" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -60,153 +71,132 @@
         </div>
 
         <div class="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-gray-900 to-transparent">
-            <button @click="otimizar()" x-show="pontos.length > 0" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-xl text-lg flex justify-center items-center gap-2">
-                <i class="fa-solid fa-route"></i> OTIMIZAR ROTA
+            <button @click="renderMap()" x-show="pontos.length > 0" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-xl flex justify-center items-center gap-2">
+                <i class="fa-solid fa-map"></i> GERAR MAPA DA ROTA
             </button>
         </div>
     </div>
 
-    <div x-show="view === 'route'" class="min-h-screen bg-gray-900 p-4">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-white text-lg font-bold">Rota Definida</h2>
-            <button @click="view = 'input'" class="text-gray-400 text-sm">Editar</button>
+    <div x-show="view === 'map'" class="h-screen bg-gray-900 flex flex-col">
+        <div class="p-4 flex justify-between items-center bg-gray-800 border-b border-gray-700">
+            <h2 class="text-white font-bold">Rota Otimizada</h2>
+            <button @click="view = 'input'" class="text-xs text-blue-400 uppercase font-bold">Voltar</button>
         </div>
 
-        <a :href="googleMapsLink()" target="_blank" class="block w-full bg-blue-600 mb-6 p-4 rounded-xl flex items-center justify-between shadow-lg shadow-blue-900/20">
-            <div>
-                <p class="font-bold text-white">Abrir Rota Completa</p>
-                <p class="text-xs text-blue-200">Ver todos os pontos no Google Maps</p>
-            </div>
-            <i class="fa-solid fa-map-location-dot text-2xl"></i>
-        </a>
+        <div id="map" class="flex-1 w-full"></div>
 
-        <div class="space-y-4 pb-20">
-            <template x-for="(ponto, index) in pontos" :key="index">
-                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 relative">
-                    <div class="absolute -left-2 top-4 bg-gray-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 border-gray-900" x-text="index + 1"></div>
-                    
-                    <div class="ml-4">
-                        <h3 class="font-bold text-lg" x-text="ponto.nome"></h3>
-                        <p class="text-gray-400 text-sm mb-3" x-text="ponto.endereco"></p>
-                        
-                        <div class="flex gap-2">
-                            <a :href="`https://waze.com/ul?q=${encodeURIComponent(ponto.endereco)}&navigate=yes`" target="_blank" class="flex-1 bg-gray-700 hover:bg-blue-500 hover:text-white py-2 rounded text-center text-sm font-bold transition-colors">
-                                <i class="fa-brands fa-waze"></i> Waze
-                            </a>
-                            <button @click="toggleStatus(index)" class="px-4 rounded bg-gray-900 border border-gray-600 text-gray-400 hover:text-green-400">
-                                <i :class="ponto.visitado ? 'fa-solid fa-check text-green-500' : 'fa-regular fa-circle'"></i>
-                            </button>
-                        </div>
+        <div class="h-40 bg-gray-800 p-4 overflow-y-auto">
+            <h3 class="text-xs text-gray-500 font-bold uppercase mb-2">Sequência de Visita</h3>
+            <div class="space-y-2">
+                <template x-for="(ponto, index) in pontos" :key="index">
+                    <div class="flex items-center gap-3">
+                        <span class="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" x-text="index + 1"></span>
+                        <p class="text-sm text-gray-300" x-text="ponto.nome"></p>
                     </div>
-                    
-                    <div x-show="ponto.visitado" class="absolute inset-0 bg-gray-900/60 backdrop-blur-[1px] rounded-xl flex items-center justify-center">
-                        <span class="text-green-500 font-bold border-2 border-green-500 px-4 py-1 rounded rotate-[-10deg]">VISITADO</span>
-                    </div>
-                </div>
-            </template>
+                </template>
+            </div>
         </div>
     </div>
 
     <script>
-        function routerApp() {
+        function geoApp() {
             return {
-                view: 'home', // home, input, route
+                view: 'home',
                 tempNome: '',
                 tempEndereco: '',
                 pontos: [],
-                listening: false,
+                loading: false,
+                mapInstance: null,
 
-                addPoint() {
-                    if (!this.tempEndereco) return alert("Digite um endereço!");
-                    
-                    // Adiciona Porto Velho automaticamente se não tiver
-                    let enderecoFinal = this.tempEndereco;
-                    if (!enderecoFinal.toLowerCase().includes("porto velho")) {
-                        enderecoFinal += ", Porto Velho - RO";
+                async addPoint() {
+                    if (!this.tempEndereco) return;
+                    this.loading = true;
+
+                    // Adiciona Porto Velho se faltar
+                    let busca = this.tempEndereco;
+                    if (!busca.toLowerCase().includes("porto velho")) busca += ", Porto Velho, Brazil";
+
+                    try {
+                        // USA API GRATUITA (Nominatim) para converter Endereço -> Latitude/Longitude
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(busca)}`);
+                        const data = await response.json();
+
+                        if (data && data.length > 0) {
+                            // Pegou o primeiro resultado
+                            this.pontos.push({
+                                nome: this.tempNome || `Alvo ${this.pontos.length + 1}`,
+                                lat: parseFloat(data[0].lat),
+                                lon: parseFloat(data[0].lon),
+                                enderecoOriginal: this.tempEndereco
+                            });
+                            this.tempNome = '';
+                            this.tempEndereco = '';
+                        } else {
+                            alert("Endereço não encontrado no GPS. Tente ser mais específico.");
+                        }
+                    } catch (e) {
+                        alert("Erro de conexão GPS.");
+                    } finally {
+                        this.loading = false;
                     }
-
-                    this.pontos.push({
-                        nome: this.tempNome || `Cliente ${this.pontos.length + 1}`,
-                        endereco: enderecoFinal,
-                        visitado: false
-                    });
-
-                    // Limpa
-                    this.tempNome = '';
-                    this.tempEndereco = '';
                 },
 
                 removePoint(index) {
                     this.pontos.splice(index, 1);
                 },
 
-                otimizar() {
-                    // Simulação visual de cálculo (1.5s)
-                    const btn = document.querySelector('button i.fa-route');
-                    if(btn) btn.classList.add('fa-spin');
-                    
-                    setTimeout(() => {
-                        if(btn) btn.classList.remove('fa-spin');
-                        this.view = 'route';
-                    }, 1500);
-                },
-
-                googleMapsLink() {
-                    if (this.pontos.length === 0) return '#';
-                    
-                    // Constrói URL do Google Maps com Waypoints
-                    // Formato: https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=ULTIMO&waypoints=MEIO1|MEIO2
-                    
-                    const base = "https://www.google.com/maps/dir/?api=1&origin=My+Location"; // My Location pega o GPS atual
-                    
-                    // O último ponto é o destino final
-                    const destino = encodeURIComponent(this.pontos[this.pontos.length - 1].endereco);
-                    
-                    // Os pontos intermediários (todos menos o último)
-                    const intermediarios = this.pontos.slice(0, -1).map(p => encodeURIComponent(p.endereco)).join('|');
-                    
-                    let url = `${base}&destination=${destino}`;
-                    if (intermediarios) {
-                        url += `&waypoints=${intermediarios}`;
-                    }
-                    
-                    return url;
-                },
-
-                toggleStatus(index) {
-                    this.pontos[index].visitado = !this.pontos[index].visitado;
-                },
-
-                // Lógica de Voz
                 startVoice() {
-                    if (!('webkitSpeechRecognition' in window)) {
-                        alert("Seu navegador não suporta voz. Use o Chrome.");
-                        return;
-                    }
-
-                    const recognition = new webkitSpeechRecognition();
+                    const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
                     recognition.lang = 'pt-BR';
-                    recognition.continuous = false;
-                    recognition.interimResults = false;
-
-                    this.listening = true;
-
-                    recognition.onresult = (event) => {
-                        const transcript = event.results[0][0].transcript;
-                        this.tempEndereco = transcript; // Preenche o endereço
-                        this.listening = false;
+                    recognition.onresult = (e) => {
+                        this.tempEndereco = e.results[0][0].transcript;
                     };
-
-                    recognition.onerror = (event) => {
-                        console.error(event);
-                        this.listening = false;
-                    };
-
-                    recognition.onend = () => {
-                        this.listening = false;
-                    };
-
                     recognition.start();
+                },
+
+                renderMap() {
+                    this.view = 'map';
+                    
+                    // Pequeno delay para o DIV do mapa existir no DOM
+                    setTimeout(() => {
+                        // Se já existe mapa, limpa para não duplicar
+                        if (this.mapInstance) {
+                            this.mapInstance.remove();
+                        }
+
+                        // 1. Inicializa o Mapa (Centro em PVH)
+                        // Usa coordenadas do primeiro ponto ou PVH centro
+                        const centro = this.pontos.length > 0 ? [this.pontos[0].lat, this.pontos[0].lon] : [-8.761, -63.903];
+                        this.mapInstance = L.map('map').setView(centro, 13);
+
+                        // 2. Adiciona os "Azulejos" (Tile Layer) - OpenStreetMap
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '© Angeleads'
+                        }).addTo(this.mapInstance);
+
+                        // 3. Prepara os pontos para a rota
+                        const waypoints = this.pontos.map(p => L.latLng(p.lat, p.lon));
+
+                        // 4. Cria a Rota e Desenha (Leaflet Routing Machine)
+                        L.Routing.control({
+                            waypoints: waypoints,
+                            routeWhileDragging: false,
+                            addWaypoints: false, // Impede usuário de mudar a rota
+                            draggableWaypoints: false,
+                            fitSelectedRoutes: true,
+                            show: false, // Esconde painel de texto
+                            lineOptions: {
+                                styles: [{color: '#2563eb', opacity: 0.8, weight: 6}]
+                            },
+                            createMarker: function(i, wp, nWps) {
+                                // Marcador Personalizado
+                                return L.marker(wp.latLng, {
+                                    draggable: false
+                                }).bindPopup(`<b>Parada ${i + 1}</b>`);
+                            }
+                        }).addTo(this.mapInstance);
+
+                    }, 100);
                 }
             }
         }
