@@ -3,164 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Angeleads Sniper</title>
+    <title>Angeleads Router</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #0f172a; color: white; -webkit-tap-highlight-color: transparent; }
-        .card { transition: all 0.2s; }
-        .card:active { transform: scale(0.98); }
+        body { background-color: #111827; color: white; -webkit-tap-highlight-color: transparent; }
+        .input-focus:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+        /* Animação do Microfone */
+        .mic-active { animation: pulse-red 1.5s infinite; background-color: #ef4444 !important; border-color: #ef4444 !important; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
     </style>
 </head>
-<body x-data="app()">
+<body x-data="routerApp()">
 
-    <div x-show="!logado" class="h-screen flex flex-col justify-center items-center p-6 bg-slate-900">
-        <div class="mb-8 text-center">
-            <h1 class="text-4xl font-bold text-blue-500 tracking-tighter">ANGELEADS</h1>
-            <p class="text-slate-400 text-sm tracking-widest uppercase mt-2">Sistema de Inteligência</p>
-        </div>
-        <button @click="login()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-3 text-lg">
-            <i class="fa-solid fa-fingerprint text-2xl"></i> Acessar com Biometria
+    <div x-show="view === 'home'" class="h-screen flex flex-col justify-center items-center bg-gray-900 transition-all">
+        <button @click="view = 'input'" class="text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-full px-8 py-3 transition-all text-sm tracking-widest uppercase font-light">
+            Definir Rotas
         </button>
-        <p class="mt-4 text-xs text-slate-500">Versão Alpha 1.0 (MVP)</p>
     </div>
 
-    <div x-show="logado" class="min-h-screen pb-20">
+    <div x-show="view === 'input'" class="min-h-screen flex flex-col bg-gray-900 p-6 pb-32">
+        <h2 class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-6 text-center">Adicionar Parada</h2>
         
-        <header class="fixed top-0 w-full bg-slate-900/95 backdrop-blur border-b border-slate-800 z-50 p-4 shadow-lg">
-            <div class="flex justify-between items-center">
-                <div>
-                    <p class="text-xs text-slate-400 font-bold uppercase">Missão Ativa</p>
-                    <h2 class="text-lg font-bold text-white">Rota Sniper #01</h2>
-                </div>
-                <div class="text-right">
-                    <p class="text-xs text-green-400 font-bold uppercase">Recuperado Hoje</p>
-                    <p class="text-xl font-mono font-bold text-white" x-text="formatMoney(totalRecuperado)"></p>
-                </div>
+        <div class="bg-gray-800 rounded-2xl p-4 border border-gray-700 shadow-xl">
+            <label class="text-xs text-gray-400 ml-1">Nome do Cliente</label>
+            <input type="text" x-model="tempNome" placeholder="Ex: Maria Silva" class="w-full bg-gray-900 text-white p-3 rounded-lg border border-gray-700 mt-1 mb-4 input-focus">
+            
+            <label class="text-xs text-gray-400 ml-1">Endereço Completo</label>
+            <div class="flex gap-2 mt-1">
+                <input type="text" x-model="tempEndereco" placeholder="Ex: Av. 7 de Setembro, 1000" class="w-full bg-gray-900 text-white p-3 rounded-lg border border-gray-700 input-focus">
+                <button @click="startVoice()" :class="listening ? 'mic-active' : 'bg-gray-700'" class="w-14 rounded-lg flex items-center justify-center transition-colors border border-gray-600">
+                    <i class="fa-solid fa-microphone text-white"></i>
+                </button>
             </div>
-            <div class="w-full bg-slate-800 h-1.5 mt-3 rounded-full overflow-hidden">
-                <div class="bg-blue-500 h-full transition-all duration-500" :style="`width: ${progresso}%`"></div>
-            </div>
-        </header>
+            
+            <button @click="addPoint()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg flex justify-center items-center gap-2">
+                <i class="fa-solid fa-plus"></i> Adicionar à Lista
+            </button>
+        </div>
 
-        <main class="mt-28 px-4 space-y-4">
-            <template x-for="(cliente, index) in clientes" :key="cliente.id">
-                <div class="card bg-slate-800 rounded-xl p-5 border border-slate-700 relative overflow-hidden" 
-                     :class="{'opacity-50 grayscale': cliente.status !== 'pendente'}">
+        <div class="mt-8 space-y-3">
+            <template x-for="(ponto, index) in pontos" :key="index">
+                <div class="flex justify-between items-center bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">
+                    <div>
+                        <p class="font-bold text-sm text-gray-200" x-text="ponto.nome"></p>
+                        <p class="text-xs text-gray-500 truncate w-48" x-text="ponto.endereco"></p>
+                    </div>
+                    <button @click="removePoint(index)" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </template>
+        </div>
+
+        <div class="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-gray-900 to-transparent">
+            <button @click="otimizar()" x-show="pontos.length > 0" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-xl text-lg flex justify-center items-center gap-2">
+                <i class="fa-solid fa-route"></i> OTIMIZAR ROTA
+            </button>
+        </div>
+    </div>
+
+    <div x-show="view === 'route'" class="min-h-screen bg-gray-900 p-4">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white text-lg font-bold">Rota Definida</h2>
+            <button @click="view = 'input'" class="text-gray-400 text-sm">Editar</button>
+        </div>
+
+        <a :href="googleMapsLink()" target="_blank" class="block w-full bg-blue-600 mb-6 p-4 rounded-xl flex items-center justify-between shadow-lg shadow-blue-900/20">
+            <div>
+                <p class="font-bold text-white">Abrir Rota Completa</p>
+                <p class="text-xs text-blue-200">Ver todos os pontos no Google Maps</p>
+            </div>
+            <i class="fa-solid fa-map-location-dot text-2xl"></i>
+        </a>
+
+        <div class="space-y-4 pb-20">
+            <template x-for="(ponto, index) in pontos" :key="index">
+                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 relative">
+                    <div class="absolute -left-2 top-4 bg-gray-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 border-gray-900" x-text="index + 1"></div>
                     
-                    <div class="absolute left-0 top-0 bottom-0 w-1" 
-                         :class="{
-                            'bg-red-500': cliente.status === 'pendente',
-                            'bg-green-500': cliente.status === 'recuperado',
-                            'bg-gray-500': cliente.status === 'perdido'
-                         }"></div>
-
-                    <div class="flex justify-between items-start mb-2 pl-2">
-                        <div>
-                            <h3 class="font-bold text-lg text-white" x-text="cliente.nome"></h3>
-                            <p class="text-xs text-red-400 font-bold bg-red-400/10 px-2 py-0.5 rounded w-fit mt-1">
-                                <i class="fa-solid fa-clock mr-1"></i> <span x-text="cliente.atraso"></span>
-                            </p>
-                        </div>
-                        <span class="text-slate-400 font-bold text-sm bg-slate-900 px-2 py-1 rounded" x-text="'#' + (index + 1)"></span>
-                    </div>
-
-                    <p class="text-slate-400 text-sm mb-4 pl-2" x-text="cliente.endereco"></p>
-
-                    <div class="grid grid-cols-2 gap-3 pl-2" x-show="cliente.status === 'pendente'">
-                        <a :href="wazeUrl(cliente.endereco)" target="_blank" 
-                           class="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold text-center flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50">
-                            <i class="fa-brands fa-waze text-xl"></i> Navegar
-                        </a>
+                    <div class="ml-4">
+                        <h3 class="font-bold text-lg" x-text="ponto.nome"></h3>
+                        <p class="text-gray-400 text-sm mb-3" x-text="ponto.endereco"></p>
                         
-                        <button @click="abrirModal(cliente)" class="bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold">
-                            Registrar
-                        </button>
+                        <div class="flex gap-2">
+                            <a :href="`https://waze.com/ul?q=${encodeURIComponent(ponto.endereco)}&navigate=yes`" target="_blank" class="flex-1 bg-gray-700 hover:bg-blue-500 hover:text-white py-2 rounded text-center text-sm font-bold transition-colors">
+                                <i class="fa-brands fa-waze"></i> Waze
+                            </a>
+                            <button @click="toggleStatus(index)" class="px-4 rounded bg-gray-900 border border-gray-600 text-gray-400 hover:text-green-400">
+                                <i :class="ponto.visitado ? 'fa-solid fa-check text-green-500' : 'fa-regular fa-circle'"></i>
+                            </button>
+                        </div>
                     </div>
-
-                    <div x-show="cliente.status !== 'pendente'" class="mt-2 pl-2 text-center py-2 bg-slate-900/50 rounded border border-dashed border-slate-600">
-                        <p class="font-bold uppercase text-sm" 
-                           :class="cliente.status === 'recuperado' ? 'text-green-400' : 'text-gray-400'"
-                           x-text="cliente.status === 'recuperado' ? '✅ RECUPERADO' : '❌ NÃO MORA MAIS'"></p>
+                    
+                    <div x-show="ponto.visitado" class="absolute inset-0 bg-gray-900/60 backdrop-blur-[1px] rounded-xl flex items-center justify-center">
+                        <span class="text-green-500 font-bold border-2 border-green-500 px-4 py-1 rounded rotate-[-10deg]">VISITADO</span>
                     </div>
                 </div>
             </template>
-        </main>
-    </div>
-
-    <div x-show="modalAberto" class="fixed inset-0 z-[60] bg-black/80 flex items-end justify-center sm:items-center p-4 backdrop-blur-sm" style="display: none;">
-        <div class="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border border-slate-700 shadow-2xl animate-slide-up">
-            <h3 class="text-xl font-bold text-white mb-2">Resultado da Visita</h3>
-            <p class="text-slate-400 text-sm mb-6">O que aconteceu com <span class="text-white font-bold" x-text="clienteAtivo?.nome"></span>?</p>
-            
-            <div class="space-y-3">
-                <button @click="marcar(clienteAtivo.id, 'recuperado')" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-green-900/20">
-                    <i class="fa-solid fa-check-circle"></i> Recuperou (Venda)
-                </button>
-                
-                <button @click="marcar(clienteAtivo.id, 'perdido')" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-4 rounded-xl flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-user-slash"></i> Não Mora / Recusou
-                </button>
-
-                <button @click="modalAberto = false" class="w-full text-slate-500 py-3 font-medium">Cancelar</button>
-            </div>
         </div>
     </div>
 
     <script>
-        function app() {
+        function routerApp() {
             return {
-                logado: false,
-                totalRecuperado: 0,
-                modalAberto: false,
-                clienteAtivo: null,
-                
-                // DADOS FAKES - SUBSTITUA PELOS REAIS DE AMANHÃ
-                clientes: [
-                    { id: 1, nome: "Maria Silva", atraso: "5 meses", endereco: "Av. 7 de Setembro, 1200, Porto Velho", status: 'pendente' },
-                    { id: 2, nome: "João Souza", atraso: "Cancelado", endereco: "Rua Jatuarana, 450, Porto Velho", status: 'pendente' },
-                    { id: 3, nome: "Carlos Pereira", atraso: "3 meses", endereco: "Rua Pau Ferro, 200, Porto Velho", status: 'pendente' },
-                    { id: 4, nome: "Ana Santos", atraso: "6 meses", endereco: "Av. Calama, 3000, Porto Velho", status: 'pendente' },
-                    { id: 5, nome: "Roberto Lima", atraso: "Cancelado", endereco: "Rua da Beira, 100, Porto Velho", status: 'pendente' }
-                ],
+                view: 'home', // home, input, route
+                tempNome: '',
+                tempEndereco: '',
+                pontos: [],
+                listening: false,
 
-                get progresso() {
-                    const total = this.clientes.length;
-                    const concluidos = this.clientes.filter(c => c.status !== 'pendente').length;
-                    return (concluidos / total) * 100;
-                },
-
-                login() {
-                    // Simula delay biométrico
-                    setTimeout(() => { this.logado = true; }, 800);
-                },
-
-                wazeUrl(endereco) {
-                    return `https://waze.com/ul?q=${encodeURIComponent(endereco)}&navigate=yes`;
-                },
-
-                abrirModal(cliente) {
-                    this.clienteAtivo = cliente;
-                    this.modalAberto = true;
-                },
-
-                marcar(id, status) {
-                    const index = this.clientes.findIndex(c => c.id === id);
-                    this.clientes[index].status = status;
+                addPoint() {
+                    if (!this.tempEndereco) return alert("Digite um endereço!");
                     
-                    if(status === 'recuperado') {
-                        this.totalRecuperado += 450; // Valor médio recuperado
-                        // Efeito sonoro simples (vibração)
-                        if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    // Adiciona Porto Velho automaticamente se não tiver
+                    let enderecoFinal = this.tempEndereco;
+                    if (!enderecoFinal.toLowerCase().includes("porto velho")) {
+                        enderecoFinal += ", Porto Velho - RO";
                     }
 
-                    this.modalAberto = false;
-                    this.clienteAtivo = null;
+                    this.pontos.push({
+                        nome: this.tempNome || `Cliente ${this.pontos.length + 1}`,
+                        endereco: enderecoFinal,
+                        visitado: false
+                    });
+
+                    // Limpa
+                    this.tempNome = '';
+                    this.tempEndereco = '';
                 },
 
-                formatMoney(value) {
-                    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                removePoint(index) {
+                    this.pontos.splice(index, 1);
+                },
+
+                otimizar() {
+                    // Simulação visual de cálculo (1.5s)
+                    const btn = document.querySelector('button i.fa-route');
+                    if(btn) btn.classList.add('fa-spin');
+                    
+                    setTimeout(() => {
+                        if(btn) btn.classList.remove('fa-spin');
+                        this.view = 'route';
+                    }, 1500);
+                },
+
+                googleMapsLink() {
+                    if (this.pontos.length === 0) return '#';
+                    
+                    // Constrói URL do Google Maps com Waypoints
+                    // Formato: https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=ULTIMO&waypoints=MEIO1|MEIO2
+                    
+                    const base = "https://www.google.com/maps/dir/?api=1&origin=My+Location"; // My Location pega o GPS atual
+                    
+                    // O último ponto é o destino final
+                    const destino = encodeURIComponent(this.pontos[this.pontos.length - 1].endereco);
+                    
+                    // Os pontos intermediários (todos menos o último)
+                    const intermediarios = this.pontos.slice(0, -1).map(p => encodeURIComponent(p.endereco)).join('|');
+                    
+                    let url = `${base}&destination=${destino}`;
+                    if (intermediarios) {
+                        url += `&waypoints=${intermediarios}`;
+                    }
+                    
+                    return url;
+                },
+
+                toggleStatus(index) {
+                    this.pontos[index].visitado = !this.pontos[index].visitado;
+                },
+
+                // Lógica de Voz
+                startVoice() {
+                    if (!('webkitSpeechRecognition' in window)) {
+                        alert("Seu navegador não suporta voz. Use o Chrome.");
+                        return;
+                    }
+
+                    const recognition = new webkitSpeechRecognition();
+                    recognition.lang = 'pt-BR';
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+
+                    this.listening = true;
+
+                    recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        this.tempEndereco = transcript; // Preenche o endereço
+                        this.listening = false;
+                    };
+
+                    recognition.onerror = (event) => {
+                        console.error(event);
+                        this.listening = false;
+                    };
+
+                    recognition.onend = () => {
+                        this.listening = false;
+                    };
+
+                    recognition.start();
                 }
             }
         }
