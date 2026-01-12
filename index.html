@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Angeleads Sniper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: white; -webkit-tap-highlight-color: transparent; }
+        .card { transition: all 0.2s; }
+        .card:active { transform: scale(0.98); }
+    </style>
+</head>
+<body x-data="app()">
+
+    <div x-show="!logado" class="h-screen flex flex-col justify-center items-center p-6 bg-slate-900">
+        <div class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-blue-500 tracking-tighter">ANGELEADS</h1>
+            <p class="text-slate-400 text-sm tracking-widest uppercase mt-2">Sistema de Inteligência</p>
+        </div>
+        <button @click="login()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-3 text-lg">
+            <i class="fa-solid fa-fingerprint text-2xl"></i> Acessar com Biometria
+        </button>
+        <p class="mt-4 text-xs text-slate-500">Versão Alpha 1.0 (MVP)</p>
+    </div>
+
+    <div x-show="logado" class="min-h-screen pb-20">
+        
+        <header class="fixed top-0 w-full bg-slate-900/95 backdrop-blur border-b border-slate-800 z-50 p-4 shadow-lg">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-slate-400 font-bold uppercase">Missão Ativa</p>
+                    <h2 class="text-lg font-bold text-white">Rota Sniper #01</h2>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-green-400 font-bold uppercase">Recuperado Hoje</p>
+                    <p class="text-xl font-mono font-bold text-white" x-text="formatMoney(totalRecuperado)"></p>
+                </div>
+            </div>
+            <div class="w-full bg-slate-800 h-1.5 mt-3 rounded-full overflow-hidden">
+                <div class="bg-blue-500 h-full transition-all duration-500" :style="`width: ${progresso}%`"></div>
+            </div>
+        </header>
+
+        <main class="mt-28 px-4 space-y-4">
+            <template x-for="(cliente, index) in clientes" :key="cliente.id">
+                <div class="card bg-slate-800 rounded-xl p-5 border border-slate-700 relative overflow-hidden" 
+                     :class="{'opacity-50 grayscale': cliente.status !== 'pendente'}">
+                    
+                    <div class="absolute left-0 top-0 bottom-0 w-1" 
+                         :class="{
+                            'bg-red-500': cliente.status === 'pendente',
+                            'bg-green-500': cliente.status === 'recuperado',
+                            'bg-gray-500': cliente.status === 'perdido'
+                         }"></div>
+
+                    <div class="flex justify-between items-start mb-2 pl-2">
+                        <div>
+                            <h3 class="font-bold text-lg text-white" x-text="cliente.nome"></h3>
+                            <p class="text-xs text-red-400 font-bold bg-red-400/10 px-2 py-0.5 rounded w-fit mt-1">
+                                <i class="fa-solid fa-clock mr-1"></i> <span x-text="cliente.atraso"></span>
+                            </p>
+                        </div>
+                        <span class="text-slate-400 font-bold text-sm bg-slate-900 px-2 py-1 rounded" x-text="'#' + (index + 1)"></span>
+                    </div>
+
+                    <p class="text-slate-400 text-sm mb-4 pl-2" x-text="cliente.endereco"></p>
+
+                    <div class="grid grid-cols-2 gap-3 pl-2" x-show="cliente.status === 'pendente'">
+                        <a :href="wazeUrl(cliente.endereco)" target="_blank" 
+                           class="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold text-center flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50">
+                            <i class="fa-brands fa-waze text-xl"></i> Navegar
+                        </a>
+                        
+                        <button @click="abrirModal(cliente)" class="bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold">
+                            Registrar
+                        </button>
+                    </div>
+
+                    <div x-show="cliente.status !== 'pendente'" class="mt-2 pl-2 text-center py-2 bg-slate-900/50 rounded border border-dashed border-slate-600">
+                        <p class="font-bold uppercase text-sm" 
+                           :class="cliente.status === 'recuperado' ? 'text-green-400' : 'text-gray-400'"
+                           x-text="cliente.status === 'recuperado' ? '✅ RECUPERADO' : '❌ NÃO MORA MAIS'"></p>
+                    </div>
+                </div>
+            </template>
+        </main>
+    </div>
+
+    <div x-show="modalAberto" class="fixed inset-0 z-[60] bg-black/80 flex items-end justify-center sm:items-center p-4 backdrop-blur-sm" style="display: none;">
+        <div class="bg-slate-800 w-full max-w-sm rounded-2xl p-6 border border-slate-700 shadow-2xl animate-slide-up">
+            <h3 class="text-xl font-bold text-white mb-2">Resultado da Visita</h3>
+            <p class="text-slate-400 text-sm mb-6">O que aconteceu com <span class="text-white font-bold" x-text="clienteAtivo?.nome"></span>?</p>
+            
+            <div class="space-y-3">
+                <button @click="marcar(clienteAtivo.id, 'recuperado')" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-green-900/20">
+                    <i class="fa-solid fa-check-circle"></i> Recuperou (Venda)
+                </button>
+                
+                <button @click="marcar(clienteAtivo.id, 'perdido')" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-4 rounded-xl flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-user-slash"></i> Não Mora / Recusou
+                </button>
+
+                <button @click="modalAberto = false" class="w-full text-slate-500 py-3 font-medium">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                logado: false,
+                totalRecuperado: 0,
+                modalAberto: false,
+                clienteAtivo: null,
+                
+                // DADOS FAKES - SUBSTITUA PELOS REAIS DE AMANHÃ
+                clientes: [
+                    { id: 1, nome: "Maria Silva", atraso: "5 meses", endereco: "Av. 7 de Setembro, 1200, Porto Velho", status: 'pendente' },
+                    { id: 2, nome: "João Souza", atraso: "Cancelado", endereco: "Rua Jatuarana, 450, Porto Velho", status: 'pendente' },
+                    { id: 3, nome: "Carlos Pereira", atraso: "3 meses", endereco: "Rua Pau Ferro, 200, Porto Velho", status: 'pendente' },
+                    { id: 4, nome: "Ana Santos", atraso: "6 meses", endereco: "Av. Calama, 3000, Porto Velho", status: 'pendente' },
+                    { id: 5, nome: "Roberto Lima", atraso: "Cancelado", endereco: "Rua da Beira, 100, Porto Velho", status: 'pendente' }
+                ],
+
+                get progresso() {
+                    const total = this.clientes.length;
+                    const concluidos = this.clientes.filter(c => c.status !== 'pendente').length;
+                    return (concluidos / total) * 100;
+                },
+
+                login() {
+                    // Simula delay biométrico
+                    setTimeout(() => { this.logado = true; }, 800);
+                },
+
+                wazeUrl(endereco) {
+                    return `https://waze.com/ul?q=${encodeURIComponent(endereco)}&navigate=yes`;
+                },
+
+                abrirModal(cliente) {
+                    this.clienteAtivo = cliente;
+                    this.modalAberto = true;
+                },
+
+                marcar(id, status) {
+                    const index = this.clientes.findIndex(c => c.id === id);
+                    this.clientes[index].status = status;
+                    
+                    if(status === 'recuperado') {
+                        this.totalRecuperado += 450; // Valor médio recuperado
+                        // Efeito sonoro simples (vibração)
+                        if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    }
+
+                    this.modalAberto = false;
+                    this.clienteAtivo = null;
+                },
+
+                formatMoney(value) {
+                    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
